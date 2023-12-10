@@ -1,0 +1,199 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARP and Traceroute Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+            color: #fff;
+        }
+
+        form {
+            margin-top: 1rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: #333;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>ARP and Traceroute Scanner</h1>
+    </header>
+    <main>
+        <h2>ARP Scan Results</h2>
+        <div id="arpDeviceList">
+            <!-- ARP devices table will be dynamically added here -->
+        </div>
+
+        <h2>Traceroute Results</h2>
+        <form id="tracerouteForm">
+            <label for="destination">Enter Destination IP:</label>
+            <input type="text" id="destination" name="destination" required>
+            <button type="submit">Run Traceroute</button>
+        </form>
+        <div id="tracerouteResult">
+            <!-- Traceroute table will be dynamically added here -->
+        </div>
+    </main>
+    <footer>
+        <p>Powered by Imran Hasan</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            try {
+                const arpResponse = await fetch('http://localhost:3001/scan');
+                if (!arpResponse.ok) {
+                    throw new Error(`HTTP error! Status: ${arpResponse.status}`);
+                }
+                const arpDevicesByInterface = await arpResponse.json();
+                displayDevices('arpDeviceList', arpDevicesByInterface);
+            } catch (error) {
+                console.error('Error fetching ARP scan results:', error);
+                displayError('Error fetching ARP scan results. Please check your server.');
+            }
+        });
+
+        document.getElementById('tracerouteForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const destination = document.getElementById('destination').value;
+            try {
+                const tracerouteResponse = await fetch(`http://localhost:3001/traceroute/${destination}`);
+                if (!tracerouteResponse.ok) {
+                    throw new Error(`HTTP error! Status: ${tracerouteResponse.status}`);
+                }
+                const tracerouteData = await tracerouteResponse.json();
+                displayTracerouteResult(tracerouteData);
+            } catch (error) {
+                console.error(`Error fetching traceroute data for ${destination}:`, error);
+                displayError('Error fetching traceroute data. Please check your server.');
+            }
+        });
+
+        function displayDevices(containerId, devicesByInterface) {
+            const deviceList = document.getElementById(containerId);
+
+            if (Object.keys(devicesByInterface).length === 0) {
+                deviceList.innerHTML = '<p>No devices found</p>';
+            } else {
+                for (const [interfaceName, devices] of Object.entries(devicesByInterface)) {
+                    const heading = document.createElement('h3');
+                    heading.textContent = `Interface: ${interfaceName}`;
+                    deviceList.appendChild(heading);
+
+                    const table = document.createElement('table');
+                    const headerRow = table.insertRow(0);
+
+                    // Add table headers
+                    const headers = ['IP', 'MAC'];
+                    headers.forEach((headerText, index) => {
+                        const header = document.createElement('th');
+                        header.innerHTML = headerText;
+                        headerRow.appendChild(header);
+                    });
+
+                    // Add devices to the table
+                    for (const device of devices) {
+                        const row = table.insertRow();
+                        const cellIp = row.insertCell(0);
+                        const cellMac = row.insertCell(1);
+
+                        cellIp.innerHTML = device.ip;
+                        cellMac.innerHTML = device.mac;
+                    }
+
+                    deviceList.appendChild(table);
+                }
+            }
+        }
+
+        function displayTracerouteResult(tracerouteData) {
+            const tracerouteResult = document.getElementById('tracerouteResult');
+
+            if (tracerouteData.error) {
+                tracerouteResult.innerHTML = `<p style="color: red;">${tracerouteData.error}</p>`;
+            } else {
+                const table = document.createElement('table');
+                const headerRow = table.insertRow(0);
+
+                // Add table headers
+                const headers = ['Hop', 'IP Address', 'Details'];
+                headers.forEach((headerText, index) => {
+                    const header = document.createElement('th');
+                    header.innerHTML = headerText;
+                    headerRow.appendChild(header);
+                });
+
+                // Add traceroute data to the table
+                for (const hop of tracerouteData) {
+                    const row = table.insertRow();
+                    const cellHop = row.insertCell(0);
+                    const cellIp = row.insertCell(1);
+                    const cellDetails = row.insertCell(2);
+
+                    const hopParts = hop.split(/\s+/);
+                    cellHop.innerHTML = hopParts[0];
+                    cellIp.innerHTML = hopParts[hopParts.length - 1];
+                    cellDetails.innerHTML = hop.replace(/\s+\d+\s+/, ''); // Remove hop number and IP address
+                }
+
+                tracerouteResult.innerHTML = '';
+                tracerouteResult.appendChild(table);
+            }
+        }
+
+        function displayError(message) {
+            const arpDeviceList = document.getElementById('arpDeviceList');
+            const tracerouteResult = document.getElementById('tracerouteResult');
+            arpDeviceList.innerHTML = `<p style="color: red;">${message}</p>`;
+            tracerouteResult.innerHTML = `<p style="color: red;">${message}</p>`;
+        }
+    </script>
+</body>
+
+</html>
